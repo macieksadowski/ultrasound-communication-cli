@@ -18,11 +18,9 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help;
 import picocli.CommandLine.IFactory;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 import picocli.shell.jline2.PicocliJLineCompleter;
-import ui.UltrasoundCli.UltrasoundCommand;
 import ultrasound.Decoder;
 
 /**
@@ -39,7 +37,7 @@ public class UltrasoundCli {
 
 	@Command(name = "", description = "Example interactive shell with completion", footer = { "",
 			"Press Ctrl-C to exit." }, subcommands = { UltrasoundStartDecoderCommand.class,UltrasoundStopDecoderCommand.class,
-					UltrasoundEncodeCommand.class, ClearScreen.class })
+					UltrasoundDecoderClearBuffersCommand.class, UltrasoundEncodeCommand.class, ClearScreen.class })
 	static class UltrasoundCommand implements Runnable {
 
 		final ConsoleReader reader;
