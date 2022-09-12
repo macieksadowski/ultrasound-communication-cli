@@ -8,9 +8,10 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import ui.UltrasoundCli.UltrasoundCommand;
+import ultrasound.AbstractCoder;
+import ultrasound.AbstractCoder.CoderMode;
 import ultrasound.Decoder;
 import ultrasound.Decoder.DecoderBuilder;
-import ultrasound.Encoder;
 
 @Command(name = "start-decoder", mixinStandardHelpOptions = true,
 description = "Record audio and decode ultrasound signal", version = "1.0")
@@ -39,6 +40,10 @@ public class UltrasoundStartDecoderCommand implements Runnable {
     
     @Option(names = {"--disable-secded"}, description = "Disable decoding with SECDED Code")
     boolean secdedDisabled = false;
+    
+    @Option(names = {"-m", "--mode"}, description = "Transmissmion mode: SIMPLE - transmit raw hex data, DATA_FRAME - uses DataFrame for transmission")
+    AbstractCoder.CoderMode mode;
+    
 	
 	@ParentCommand UltrasoundCommand parent;
 	
@@ -47,49 +52,59 @@ public class UltrasoundStartDecoderCommand implements Runnable {
 
 		try {
 			HashMap<String, String> params = UltrasoundCli.loadParamsProperties();
-			if(sampleRate == 0) {
+			if (sampleRate == 0) {
 				sampleRate = Integer.valueOf(params.get("sampleRate"));
 			}
-			if(noOfChannels == 0) {
+			if (noOfChannels == 0) {
 				noOfChannels = Integer.valueOf(params.get("noOfChannels"));
 			}
-			if(firstFreq == 0) {
+			if (firstFreq == 0) {
 				firstFreq = Integer.valueOf(params.get("firstFreq"));
 			}
-			if(freqStep == 0) {
+			if (freqStep == 0) {
 				freqStep = Integer.valueOf(params.get("freqStep"));
 			}
-			if(nfft == 0) {
+			if (nfft == 0) {
 				nfft = Integer.valueOf(params.get("nfft"));
 			}
-			if(threshold == 0) {
+			if (threshold == 0) {
 				threshold = Double.valueOf(params.get("threshold"));
 			}
-			if(!secdedDisabled) {
-				if(params.get("disable-secded") != null) {
+			if (!secdedDisabled) {
+				if (params.get("disable-secded") != null) {
 					secdedDisabled = Boolean.valueOf(params.get("disable-secded"));
 				}
 			}
-			
- 			DecoderBuilder decoderBuilder = new DecoderBuilder(sampleRate, noOfChannels, firstFreq, freqStep, (int) Math.pow(2, nfft), threshold);
+
+			if (mode == null) {
+				if (params.get("disable-secded") != null) {
+					try {
+						mode = CoderMode.valueOf(params.get("mode"));
+					} catch (Exception e) {
+					}
+				}
+			}
+
+			DecoderBuilder decoderBuilder = new DecoderBuilder(sampleRate, noOfChannels, firstFreq, freqStep,
+					(int) Math.pow(2, nfft), threshold);
 			decoderBuilder.secdedEnabled(!secdedDisabled);
-			
-			if(tOnePulse != 0) {
+			decoderBuilder.mode(mode);
+
+			if (tOnePulse != 0) {
 				decoderBuilder.tOnePulse(tOnePulse);
-			} else if(params.get("tOnePulse") != null) {
+			} else if (params.get("tOnePulse") != null) {
 				decoderBuilder.tOnePulse(Double.valueOf(params.get("tOnePulse") + "d"));
 			}
-			
 
 			Decoder decoder = decoderBuilder.build();
 			if (decoder != null) {
-				
+
 				parent.setDecoder(decoder);
 				Thread decoderThread = new Thread(decoder);
 				decoderThread.setName("Decoder Thread");
 				parent.setDecoderThread(decoderThread);
 				decoderThread.start();
-				
+
 			} else
 				throw new Exception("Failed to build Decoder object!");
 
@@ -104,12 +119,6 @@ public class UltrasoundStartDecoderCommand implements Runnable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
+
 	}
-
-	
-	
-
-
-
 }

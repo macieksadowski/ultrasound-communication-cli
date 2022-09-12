@@ -9,16 +9,20 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 import ui.UltrasoundCli.UltrasoundCommand;
+import ultrasound.AbstractCoder;
+import ultrasound.AbstractCoder.CoderMode;
+import ultrasound.ControlCodes;
+import ultrasound.DataFrame;
+import ultrasound.DataFrame.DataFrameBuilder;
 import ultrasound.Encoder;
 import ultrasound.Encoder.EncoderBuilder;
-import ultrasound.UltrasoundHelper;
 
 @Command(name = "encode", mixinStandardHelpOptions = true,
 description = "Encode and play ultrasound signal", version = "1.0")
 public class UltrasoundEncodeCommand implements Runnable {
 	
-	@Parameters(index = "0", description = "Message to transmit (hexadecimal)")
-	String hexMessage;
+	@Parameters(index = "0", description = "Message to transmit (ASCII)")
+	String message;
 	
     @Option(names = {"-sr", "--sample-rate"}, description = "Sample rate")
     int sampleRate;
@@ -40,60 +44,85 @@ public class UltrasoundEncodeCommand implements Runnable {
     
     @Option(names = {"--disable-secded"}, description = "Disable decoding with SECDED Code")
     boolean secdedDisabled = false;
-
+    
+    @Option(names = {"-m", "--mode"}, description = "Transmissmion mode: SIMPLE - transmit raw hex data, DATA_FRAME - uses DataFrame for transmission")
+    AbstractCoder.CoderMode mode;
+    
 	@ParentCommand UltrasoundCommand parent;
 	
 	public void run() {
 
 		try {
 			HashMap<String, String> params = UltrasoundCli.loadParamsProperties();
-			if(sampleRate == 0) {
+			if (sampleRate == 0) {
 				sampleRate = Integer.valueOf(params.get("sampleRate"));
 			}
-			if(noOfChannels == 0) {
+			if (noOfChannels == 0) {
 				noOfChannels = Integer.valueOf(params.get("noOfChannels"));
 			}
-			if(firstFreq == 0) {
+			if (firstFreq == 0) {
 				firstFreq = Integer.valueOf(params.get("firstFreq"));
 			}
-			if(freqStep == 0) {
+			if (freqStep == 0) {
 				freqStep = Integer.valueOf(params.get("freqStep"));
 			}
-			
-			if(!secdedDisabled) {
-				if(params.get("disable-secded") != null) {
+
+			if (!secdedDisabled) {
+				if (params.get("disable-secded") != null) {
 					secdedDisabled = Boolean.valueOf(params.get("disable-secded"));
 				}
 			}
-			
-			EncoderBuilder encoderBuilder =  new EncoderBuilder(sampleRate, noOfChannels, firstFreq, freqStep);
-			
+
+			if (mode == null) {
+				if (params.get("disable-secded") != null) {
+					mode = CoderMode.valueOf(params.get("mode"));
+				}
+			}
+
+			EncoderBuilder encoderBuilder = new EncoderBuilder(sampleRate, noOfChannels, firstFreq, freqStep);
+
 			encoderBuilder.secdedEnabled(!secdedDisabled);
-			
-			if(tOnePulse != 0) {
+
+			encoderBuilder.mode(mode);
+
+			if (tOnePulse != 0) {
 				encoderBuilder.tOnePulse(tOnePulse);
-			} else if(params.get("tOnePulse") != null) {
+			} else if (params.get("tOnePulse") != null) {
 				encoderBuilder.tOnePulse(Double.valueOf(params.get("tOnePulse") + "d"));
 			}
-			
-			if(tBreak != 0) {
+
+			if (tBreak != 0) {
 				encoderBuilder.tBreak(tBreak);
-			} else if(params.get("tBreak") != null) {
+			} else if (params.get("tBreak") != null) {
 				encoderBuilder.tBreak(Double.valueOf(params.get("tBreak") + "d"));
 			}
-			
+
 			Encoder encoder = encoderBuilder.build();
-			
-			if(hexMessage != null && !hexMessage.isEmpty()) {
-				try {
-					UltrasoundHelper.hex2bin(hexMessage);
-				} catch (NumberFormatException e) {
-					System.err.println("Invalid hex message.");
-					return;
+
+			byte[] byteMessage = message.getBytes();
+
+			switch (encoder.getMode()) {
+			case DATA_FRAME:
+				DataFrameBuilder frameBuilder = new DataFrameBuilder(DataFrame.BROADCAST_ADDRESS, noOfChannels);
+				frameBuilder.data(byteMessage);
+				frameBuilder.command(ControlCodes.STX);
+				frameBuilder.data(byteMessage);
+
+				encoder.setDataFrame(frameBuilder.build());
+				break;
+			case SIMPLE:
+				StringBuilder hexMessageBuilder = new StringBuilder();
+				for (byte b : byteMessage) {
+					hexMessageBuilder.append(Integer.toHexString(b));
 				}
-				encoder.setHexData(hexMessage);
-				encoder.run();
+				encoder.setHexData(hexMessageBuilder.toString());
+				break;
+			default:
+				break;
+
 			}
+
+			encoder.run();
 
 		} catch (FileNotFoundException e) {
 
