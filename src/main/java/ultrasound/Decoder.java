@@ -61,7 +61,7 @@ public final class Decoder extends AbstractDecoder implements Runnable {
 
 		recorder.stop();
 		try {
-			recorderThread.join();
+			recorderThread.join(100);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}

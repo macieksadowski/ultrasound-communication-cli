@@ -69,8 +69,8 @@ public class RecorderThread implements Runnable {
 			
 //				FileUtil.saveToFile("frag", sa);
 				
-				while(buffer.isFull()) {
-					boolean communicate = false;
+				boolean communicate = false;
+				while(buffer.isFull() && isRunning) {
 					if(!communicate) {
 						System.out.println("REC - Buffer is full!");
 						communicate = true;
