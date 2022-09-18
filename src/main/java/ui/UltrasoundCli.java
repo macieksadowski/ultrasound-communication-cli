@@ -18,10 +18,20 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help;
 import picocli.CommandLine.IFactory;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 import picocli.shell.jline2.PicocliJLineCompleter;
+import ui.UltrasoundDeviceCommands.UltrasoundMasterSendCmdCommand;
+import ui.UltrasoundDeviceCommands.UltrasoundMasterSendDataCommand;
+import ui.UltrasoundDeviceCommands.UltrasoundSlaveStartCommand;
+import ui.UltrasoundDeviceCommands.UltrasoundSlaveStopCommand;
 import ultrasound.Decoder;
+import ultrasound.Decoder.DecoderBuilder;
+import ultrasound.Encoder.EncoderBuilder;
+import ultrasound.ICoder.CoderMode;
+import ultrasound.IDecoder;
+import ultrasound.IEncoder;
+import ultrasound.devices.MasterUltrasoundDevice;
+import ultrasound.devices.SlaveUltrasoundDevice;
+import ultrasound.utils.UltrasoundHelper;
 
 /**
  * Source:
@@ -34,18 +44,18 @@ public class UltrasoundCli {
 	
 	private static Thread DECODER_THREAD;
 	private static Decoder DECODER;
+	private static MasterUltrasoundDevice MASTER;
+	private static Thread SLAVE_THREAD;
+	private static SlaveUltrasoundDevice SLAVE;
+	
+	private static CommandLine cmd;
 
-	@Command(name = "", description = "Example interactive shell with completion", footer = { "",
-			"Press Ctrl-C to exit." }, subcommands = { UltrasoundStartDecoderCommand.class,UltrasoundStopDecoderCommand.class,
-					UltrasoundDecoderClearBuffersCommand.class, UltrasoundEncodeCommand.class, ClearScreen.class })
+	@Command(name = "", description = "Ultrasound Cli", footer = { "",
+			"Press Ctrl-C to exit." })
 	static class UltrasoundCommand implements Runnable {
 
 		final ConsoleReader reader;
 		final PrintWriter out;
-		
-
-		@Spec
-		private CommandSpec spec;
 
 		public UltrasoundCommand(ConsoleReader reader) {
 			this.reader = reader;
@@ -53,7 +63,7 @@ public class UltrasoundCli {
 		}
 
 		public void run() {
-			out.println(spec.commandLine().getUsageMessage());
+			out.println(cmd.getUsageMessage());
 
 		}
 		
@@ -72,6 +82,22 @@ public class UltrasoundCli {
 		public Thread getDecoderThread() {
 			return DECODER_THREAD;
 		}
+		
+		public MasterUltrasoundDevice getMaster() {
+			return MASTER;
+		}
+		
+		public SlaveUltrasoundDevice getSlave() {
+			return SLAVE;
+		}
+		
+		public void setSlaveThread(Thread _slaveThread) {
+			SLAVE_THREAD = _slaveThread;
+		}
+		
+		public Thread getSlaveThread() {
+			return SLAVE_THREAD;
+		}
 
 	}
 	
@@ -86,26 +112,126 @@ public class UltrasoundCli {
 		try {
 			ConsoleReader reader = new ConsoleReader();
 			IFactory factory = new CustomFactory(new InteractiveParameterConsumer(reader));
-
-			// set up the completion
+			
 			UltrasoundCommand commands = new UltrasoundCommand(reader);
-			CommandLine cmd = new CommandLine(commands, factory);
+			
+			cmd = new CommandLine(commands, factory);
+			
+			
+			cmd.addSubcommand(new ClearScreen());
+			
+			if(args.length > 0) {
+				DeviceType mode = DeviceType.valueOf(args[0]);
+				switch(mode) {
+				case master:
+					initializeAsMasterDevice();
+					break;
+				case slave:
+					initializeAsSlaveDevice();
+					break;
+				}	
+			} else {
+				initializeDefault();
+			}
+			
+			
 			reader.addCompleter(new PicocliJLineCompleter(cmd.getCommandSpec()));
 
 			// start the shell and process input until the user quits with Ctrl-D
 			String line;
 			while ((line = reader.readLine("> ")) != null) {
 				ArgumentList list = new WhitespaceArgumentDelimiter().delimit(line, line.length());
-				new CommandLine(commands, factory).execute(list.getArguments());
+				cmd.execute(list.getArguments());
 			}
 		} catch (Throwable t) {
 			t.printStackTrace();
 		}
 	}
+	
+	public static void initializeAsMasterDevice() {
+		
+		initializeDevice(DeviceType.master);
+		
+		cmd.addSubcommand(new UltrasoundMasterSendCmdCommand());
+		cmd.addSubcommand(new UltrasoundMasterSendDataCommand());
+		
+	}
+	
+	public static void initializeAsSlaveDevice() {
+		
+		initializeDevice(DeviceType.slave);
+		
+		cmd.addSubcommand(new UltrasoundSlaveStartCommand());
+		cmd.addSubcommand(new UltrasoundSlaveStopCommand());
+		
+	}
+	
+	public static void initializeDevice(DeviceType type) {
+		try {
+			HashMap<String, String> params = UltrasoundCli.loadParamsProperties();
 
+			int sampleRate = Integer.valueOf(params.get("sampleRate"));
+			int noOfChannels = Integer.valueOf(params.get("noOfChannels"));
+			int firstFreq = Integer.valueOf(params.get("firstFreq"));
+			int freqStep = Integer.valueOf(params.get("freqStep"));
+			double tOnePulse = Double.valueOf(params.get("tOnePulse") + "d");
+			double threshold = Double.valueOf(params.get("threshold"));
+			int nfft = Integer.valueOf(params.get("nfft"));
+			byte address = UltrasoundHelper.hexToByte(params.get("slaveAddress"));
+			
+			DecoderBuilder db = new DecoderBuilder(sampleRate, noOfChannels, firstFreq, freqStep, (int) Math.pow(2, nfft), threshold);
+			db.mode(CoderMode.DATA_FRAME);
+			db.tOnePulse(tOnePulse);
+			IDecoder decoder = db.build();
+			
+			EncoderBuilder eb = new EncoderBuilder(sampleRate, noOfChannels, firstFreq, freqStep);
+			eb.mode(CoderMode.DATA_FRAME);
+			eb.tOnePulse(tOnePulse);
+			IEncoder encoder = eb.build();
+			
+			
+			if(type == DeviceType.master) {
+			    MASTER = new MasterUltrasoundDevice(encoder, decoder);
+			    
+			    if (params.get("masterDecoderTimeout") != null) {
+			    	long timeout = (long) (Double.valueOf(params.get("masterDecoderTimeout")) * 1000);
+					MASTER.setDecoderTimeout(timeout);
+				}
+			} else {
+				SLAVE = new SlaveUltrasoundDevice(address, encoder, decoder);
+			}
+
+			
+
+		} catch (FileNotFoundException e) {
+
+			e.printStackTrace();
+
+		} catch (IOException e) {
+
+			e.printStackTrace();
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public static void initializeDefault() {
+		cmd.addSubcommand(new UltrasoundStartDecoderCommand());
+		cmd.addSubcommand(new UltrasoundStopDecoderCommand());
+		cmd.addSubcommand(new UltrasoundDecoderClearBuffersCommand());
+		cmd.addSubcommand(new UltrasoundEncodeCommand());
+		
+	}
+	
+	
 	public static HashMap<String, String> loadParamsProperties() throws FileNotFoundException, IOException {
+		return loadParamsProperties("params.properties");
+	}
+
+	public static HashMap<String, String> loadParamsProperties(String fileName) throws FileNotFoundException, IOException {
 		String rootPath = Thread.currentThread().getContextClassLoader().getResource("").getPath();
-		String appConfigPath = rootPath + "params.properties";
+		String appConfigPath = rootPath + fileName;
 
 		Properties paramsProps = new Properties();
 		paramsProps.load(new FileInputStream(appConfigPath));
@@ -118,7 +244,10 @@ public class UltrasoundCli {
 	}
 	
 
-
+	public enum DeviceType {
+		master,
+		slave
+	}
 
 	
 
