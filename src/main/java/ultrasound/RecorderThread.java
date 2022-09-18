@@ -12,6 +12,8 @@ import javax.sound.sampled.TargetDataLine;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import ultrasound.utils.CircularBuffer;
+
 public class RecorderThread implements Runnable {
 
 	private final CircularBuffer<List<Short>> buffer;

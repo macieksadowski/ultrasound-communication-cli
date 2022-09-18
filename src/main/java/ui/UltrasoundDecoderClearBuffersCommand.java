@@ -14,6 +14,7 @@ public class UltrasoundDecoderClearBuffersCommand implements Runnable {
 	public void run() {
 		if(parent.getDecoderThread() != null && parent.getDecoder().isRunning()) {
 			parent.getDecoder().clearReceivedDataBuffers();
+			parent.getDecoder().clearResult();
 			parent.out.println("Decoder data buffers cleared!");
 		} else {
 			parent.out.println("Decoder isn't running, nothing to do...");

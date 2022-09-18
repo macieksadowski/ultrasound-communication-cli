@@ -10,12 +10,12 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 import ui.UltrasoundCli.UltrasoundCommand;
 import ultrasound.AbstractCoder;
-import ultrasound.AbstractCoder.CoderMode;
-import ultrasound.ControlCodes;
-import ultrasound.DataFrame;
-import ultrasound.DataFrame.DataFrameBuilder;
 import ultrasound.Encoder;
 import ultrasound.Encoder.EncoderBuilder;
+import ultrasound.ICoder.CoderMode;
+import ultrasound.dataframe.DataFrame.DataFrameBuilder;
+import ultrasound.dataframe.IAsciiControlCodes;
+import ultrasound.dataframe.IDataFrame;
 
 @Command(name = "encode", mixinStandardHelpOptions = true,
 description = "Encode and play ultrasound signal", version = "1.0")
@@ -103,9 +103,9 @@ public class UltrasoundEncodeCommand implements Runnable {
 
 			switch (encoder.getMode()) {
 			case DATA_FRAME:
-				DataFrameBuilder frameBuilder = new DataFrameBuilder(DataFrame.BROADCAST_ADDRESS, noOfChannels);
+				DataFrameBuilder frameBuilder = new DataFrameBuilder(IDataFrame.BROADCAST_ADDRESS, noOfChannels);
 				frameBuilder.data(byteMessage);
-				frameBuilder.command(ControlCodes.STX);
+				frameBuilder.command(IAsciiControlCodes.STX);
 				frameBuilder.data(byteMessage);
 
 				encoder.setDataFrame(frameBuilder.build());

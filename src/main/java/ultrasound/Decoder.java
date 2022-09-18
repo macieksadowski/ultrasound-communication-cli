@@ -5,10 +5,12 @@ import java.util.List;
 
 import org.apache.commons.lang3.ArrayUtils;
 
-public final class Decoder extends AbstractDecoder implements Runnable {
+import ultrasound.utils.CircularBuffer;
+
+public final class Decoder extends AbstractDecoder implements Runnable, IDecoder {
 
 	private final CircularBuffer<List<Short>> buffer;
-	protected boolean audioRecorderConnected;
+	protected boolean audioRecorderRunning;
 	private RecorderThread recorder;
 	private Thread recorderThread;
 	private PrintWriter out;
@@ -17,7 +19,8 @@ public final class Decoder extends AbstractDecoder implements Runnable {
 		super(builder);
 
 		this.buffer = new CircularBuffer<List<Short>>(64);
-		audioRecorderConnected = false;
+		audioRecorderRunning = false;
+		recorder = new RecorderThread(buffer, N, sampleRate);
 
 	}
 
@@ -35,7 +38,7 @@ public final class Decoder extends AbstractDecoder implements Runnable {
 			try {
 				validate();
 				decoder = new Decoder(this);
-				decoder.connectToAudioRecorder();
+				decoder.startAudioRecorder();
 				return decoder;
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -49,15 +52,24 @@ public final class Decoder extends AbstractDecoder implements Runnable {
 
 	}
 
-	public boolean isAudioRecorderConnected() {
-		return audioRecorderConnected;
+	public boolean isAudioRecorderRunning() {
+		return audioRecorderRunning;
 	}
 
 	protected void startRecording() {
+		if(!isAudioRecorderRunning()) {
+			startAudioRecorder();
+		}
 		recorderThread.start();
 	}
+	
+	private void startAudioRecorder() {
+		recorderThread = new Thread(recorder);
+		recorderThread.setName("Recorder Thread");
+		audioRecorderRunning = true;
+	}
 
-	protected void closeRecorder() {
+	protected void stopAudioRecorder() {
 
 		recorder.stop();
 		try {
@@ -66,6 +78,7 @@ public final class Decoder extends AbstractDecoder implements Runnable {
 			e.printStackTrace();
 		}
 		recorderThread = null;
+		audioRecorderRunning = false;
 	}
 	
 	public void connectToLogOutput(PrintWriter out) {
@@ -80,7 +93,7 @@ public final class Decoder extends AbstractDecoder implements Runnable {
 	 */
 	protected short[] getAudioSamples() throws Exception {
 
-		if (!audioRecorderConnected) {
+		if (!audioRecorderRunning) {
 			throw new Exception("Audio Recorder need to be initialized first!");
 		}
 		short[] frag = new short[N];
@@ -103,12 +116,9 @@ public final class Decoder extends AbstractDecoder implements Runnable {
 		}
 
 	}
-	
-	private void connectToAudioRecorder() {
-		recorder = new RecorderThread(buffer, N, sampleRate);
-		recorderThread = new Thread(recorder);
-		recorderThread.setName("Recorder Thread");
-		audioRecorderConnected = true;
 
+	@Override
+	protected void onDataFrameSuccessfullyReceived() {
+		
 	}
 }

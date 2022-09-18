@@ -14,6 +14,11 @@ public class UltrasoundStopDecoderCommand implements Runnable {
 	public void run() {
 		if(parent.getDecoderThread() != null && parent.getDecoder().isRunning()) {
 			parent.getDecoder().stopRecording();
+			try {
+				parent.getDecoderThread().join(100);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 			parent.setDecoderThread(null);
 			parent.out.println("Decoder stopped!");
 		} else {

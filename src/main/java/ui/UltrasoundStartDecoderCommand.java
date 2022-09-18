@@ -9,9 +9,9 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import ui.UltrasoundCli.UltrasoundCommand;
 import ultrasound.AbstractCoder;
-import ultrasound.AbstractCoder.CoderMode;
 import ultrasound.Decoder;
 import ultrasound.Decoder.DecoderBuilder;
+import ultrasound.ICoder.CoderMode;
 
 @Command(name = "start-decoder", mixinStandardHelpOptions = true,
 description = "Record audio and decode ultrasound signal", version = "1.0")
