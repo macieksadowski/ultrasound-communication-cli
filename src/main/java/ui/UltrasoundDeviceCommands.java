@@ -26,7 +26,12 @@ public class UltrasoundDeviceCommands {
 		public void run() {
 			
 			MasterUltrasoundDevice master = parent.getMaster();
-
+			if(parent.getMasterThread() == null) {
+				parent.setMasterThread(new Thread(master));
+				parent.getMasterThread().setName("Master Thread");
+				parent.getMasterThread().start();
+			}
+			
 			Byte command = ControlCodes.getCodeByName(cmd);
 			if (command != null) {
 
@@ -58,6 +63,11 @@ public class UltrasoundDeviceCommands {
 		public void run() {
 			
 			MasterUltrasoundDevice master = parent.getMaster();
+			if(parent.getMasterThread() == null) {
+				parent.setMasterThread(new Thread(master));
+				parent.getMasterThread().setName("Master Thread");
+				parent.getMasterThread().start();
+			}
 
 			byte[] data = dataStr.getBytes(StandardCharsets.US_ASCII);
 			if (adr != null) {
@@ -67,6 +77,27 @@ public class UltrasoundDeviceCommands {
 				master.sendBroadcast(data);
 			}
 
+		}
+	}
+	
+	@Command(name = "stop", mixinStandardHelpOptions = true, description = "Stop master device", version = "1.0")
+	public static class UltrasoundMasterStopCommand implements Runnable {
+
+		@ParentCommand
+		UltrasoundCommand parent;
+		
+		public void run() {
+		
+			if(parent.getMasterThread() != null) {
+				parent.getMaster().stop();
+				try {
+					parent.getMasterThread().join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				parent.setMasterThread(null);
+			}
+		
 		}
 	}
 	
@@ -80,6 +111,7 @@ public static class UltrasoundSlaveStartCommand implements Runnable {
 	public void run() {
 		
 		parent.setSlaveThread(new Thread(parent.getSlave()));
+		parent.getSlaveThread().setName("Slave Thread");
 		parent.getSlaveThread().start();
 	
 	}

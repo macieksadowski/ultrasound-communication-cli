@@ -44,6 +44,7 @@ public class UltrasoundCli {
 	
 	private static Thread DECODER_THREAD;
 	private static Decoder DECODER;
+	private static Thread MASTER_THREAD;
 	private static MasterUltrasoundDevice MASTER;
 	private static Thread SLAVE_THREAD;
 	private static SlaveUltrasoundDevice SLAVE;
@@ -98,6 +99,14 @@ public class UltrasoundCli {
 		public Thread getSlaveThread() {
 			return SLAVE_THREAD;
 		}
+		
+		public void setMasterThread(Thread _masterThread) {
+			MASTER_THREAD = _masterThread;
+		}
+		
+		public Thread getMasterThread() {
+			return MASTER_THREAD;
+		}
 
 	}
 	
@@ -127,7 +136,11 @@ public class UltrasoundCli {
 					initializeAsMasterDevice();
 					break;
 				case slave:
-					initializeAsSlaveDevice();
+					Byte adr = null;
+					if(args.length > 1) {
+						adr = Byte.parseByte(args[1]);
+					}
+					initializeAsSlaveDevice(adr);
 					break;
 				}	
 			} else {
@@ -157,9 +170,9 @@ public class UltrasoundCli {
 		
 	}
 	
-	public static void initializeAsSlaveDevice() {
+	public static void initializeAsSlaveDevice(Byte adr) {
 		
-		initializeDevice(DeviceType.slave);
+		initializeDevice(DeviceType.slave, adr);
 		
 		cmd.addSubcommand(new UltrasoundSlaveStartCommand());
 		cmd.addSubcommand(new UltrasoundSlaveStopCommand());
@@ -167,6 +180,10 @@ public class UltrasoundCli {
 	}
 	
 	public static void initializeDevice(DeviceType type) {
+		initializeDevice(type, null);
+	}
+	
+	public static void initializeDevice(DeviceType type, Byte address) {
 		try {
 			HashMap<String, String> params = UltrasoundCli.loadParamsProperties();
 
@@ -177,7 +194,9 @@ public class UltrasoundCli {
 			double tOnePulse = Double.valueOf(params.get("tOnePulse") + "d");
 			double threshold = Double.valueOf(params.get("threshold"));
 			int nfft = Integer.valueOf(params.get("nfft"));
-			byte address = UltrasoundHelper.hexToByte(params.get("slaveAddress"));
+			if(address == null && type == DeviceType.slave) {
+				address = UltrasoundHelper.hexToByte(params.get("slaveAddress"));
+			}
 			
 			DecoderBuilder db = new DecoderBuilder(sampleRate, noOfChannels, firstFreq, freqStep, (int) Math.pow(2, nfft), threshold);
 			db.mode(CoderMode.DATA_FRAME);
