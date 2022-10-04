@@ -1,26 +1,30 @@
 package ultrasound;
 
-import java.io.PrintWriter;
 import java.util.List;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import ultrasound.decoder.AbstractDecoder;
+import ultrasound.decoder.AbstractDecoderBuilder;
 import ultrasound.utils.CircularBuffer;
 
-public final class Decoder extends AbstractDecoder implements Runnable, IDecoder {
+public final class Decoder extends AbstractDecoder {
+	
+	private static final int BUFFER_SIZE = 64;
 
 	private final CircularBuffer<List<Short>> buffer;
-	protected boolean audioRecorderRunning;
+	private boolean audioRecorderRunning;
 	private RecorderThread recorder;
 	private Thread recorderThread;
-	private PrintWriter out;
 
 	private Decoder(DecoderBuilder builder) throws Exception {
 		super(builder);
 
-		this.buffer = new CircularBuffer<List<Short>>(64);
+		this.buffer = new CircularBuffer<List<Short>>(BUFFER_SIZE);
 		audioRecorderRunning = false;
 		recorder = new RecorderThread(buffer, N, sampleRate);
+
+		initializeAudioRecorder();
 
 	}
 
@@ -29,27 +33,18 @@ public final class Decoder extends AbstractDecoder implements Runnable, IDecoder
 		public DecoderBuilder(int sampleRate, int noOfChannels, int firstFreq, int freqStep, int nfft,
 				double threshold) {
 			super(sampleRate, noOfChannels, firstFreq, freqStep, nfft, threshold);
-
 		}
 
 		@Override
 		public Decoder build() {
-			Decoder decoder;
 			try {
 				validate();
-				decoder = new Decoder(this);
-				decoder.startAudioRecorder();
-				return decoder;
+				return new Decoder(this);
 			} catch (Exception e) {
 				e.printStackTrace();
 				return null;
 			}
 		}
-
-		protected final void validate() {
-			super.validate();
-		}
-
 	}
 
 	public boolean isAudioRecorderRunning() {
@@ -57,16 +52,16 @@ public final class Decoder extends AbstractDecoder implements Runnable, IDecoder
 	}
 
 	protected void startRecording() {
-		if(!isAudioRecorderRunning()) {
-			startAudioRecorder();
+		if (!isAudioRecorderRunning()) {
+			initializeAudioRecorder();
 		}
 		recorderThread.start();
+		audioRecorderRunning = true;
 	}
-	
-	private void startAudioRecorder() {
+
+	private void initializeAudioRecorder() {
 		recorderThread = new Thread(recorder);
 		recorderThread.setName("Recorder Thread");
-		audioRecorderRunning = true;
 	}
 
 	protected void stopAudioRecorder() {
@@ -75,14 +70,10 @@ public final class Decoder extends AbstractDecoder implements Runnable, IDecoder
 		try {
 			recorderThread.join(100);
 		} catch (InterruptedException e) {
-			e.printStackTrace();
+			Thread.currentThread().interrupt();
 		}
 		recorderThread = null;
 		audioRecorderRunning = false;
-	}
-	
-	public void connectToLogOutput(PrintWriter out) {
-		this.out = out;
 	}
 
 	@Override
@@ -107,18 +98,7 @@ public final class Decoder extends AbstractDecoder implements Runnable, IDecoder
 	}
 
 	@Override
-	protected void logMessage(String s) {
-		String msg = "DEC - " + s;
-		if (out != null) {
-			out.println(msg);
-		} else {
-			System.out.println(msg);
-		}
-
-	}
-
-	@Override
 	protected void onDataFrameSuccessfullyReceived() {
-		
+
 	}
 }

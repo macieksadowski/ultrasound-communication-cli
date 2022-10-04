@@ -21,16 +21,18 @@ import picocli.CommandLine.IFactory;
 import picocli.shell.jline2.PicocliJLineCompleter;
 import ui.UltrasoundDeviceCommands.UltrasoundMasterSendCmdCommand;
 import ui.UltrasoundDeviceCommands.UltrasoundMasterSendDataCommand;
+import ui.UltrasoundDeviceCommands.UltrasoundMasterStopCommand;
 import ui.UltrasoundDeviceCommands.UltrasoundSlaveStartCommand;
 import ui.UltrasoundDeviceCommands.UltrasoundSlaveStopCommand;
+
 import ultrasound.Decoder;
 import ultrasound.Decoder.DecoderBuilder;
 import ultrasound.Encoder.EncoderBuilder;
 import ultrasound.ICoder.CoderMode;
-import ultrasound.IDecoder;
-import ultrasound.IEncoder;
+import ultrasound.decoder.IDecoder;
 import ultrasound.devices.MasterUltrasoundDevice;
 import ultrasound.devices.SlaveUltrasoundDevice;
+import ultrasound.encoder.IEncoder;
 import ultrasound.utils.UltrasoundHelper;
 
 /**
@@ -68,8 +70,8 @@ public class UltrasoundCli {
 
 		}
 		
-		public void setDecoder(Decoder _decoder) {
-			DECODER = _decoder;
+		public void setDecoder(Decoder decoder) {
+			DECODER = decoder;
 		}
 		
 		public Decoder getDecoder() {
@@ -167,6 +169,7 @@ public class UltrasoundCli {
 		
 		cmd.addSubcommand(new UltrasoundMasterSendCmdCommand());
 		cmd.addSubcommand(new UltrasoundMasterSendDataCommand());
+		cmd.addSubcommand(new UltrasoundMasterStopCommand());
 		
 	}
 	

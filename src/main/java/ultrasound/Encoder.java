@@ -1,6 +1,5 @@
 package ultrasound;
 
-import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 
 import javax.sound.sampled.AudioFormat;
@@ -9,10 +8,14 @@ import javax.sound.sampled.DataLine;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
 
-public final class Encoder extends AbstractEncoder implements Runnable {
+import ultrasound.encoder.AbstractEncoder;
+import ultrasound.encoder.AbstractEncoderBuilder;
 
-	private AudioFormat format;
-	private PrintWriter out;
+public final class Encoder extends AbstractEncoder {
+
+	private static final int SAMPLE_SIZE = 16;
+	private static final int RECORDING_CHANNELS = 1;
+
 	private SourceDataLine dataLine;
 
 	private Encoder(EncoderBuilder builder) {
@@ -31,18 +34,9 @@ public final class Encoder extends AbstractEncoder implements Runnable {
 		@Override
 		public Encoder build() {
 			validate();
-			Encoder encoder = new Encoder(this);
-			return encoder;
+			return new Encoder(this);
 		}
 
-		protected final void validate() {
-			super.validate();
-		}
-
-	}
-	
-	public void connectToLogOutput(PrintWriter out) {
-		this.out = out;
 	}
 
 	@Override
@@ -55,35 +49,23 @@ public final class Encoder extends AbstractEncoder implements Runnable {
 		this.dataLine.write(bb.array(), 0, byteLength);
 
 	}
-	
+
 	protected void constructAudioStream() throws LineUnavailableException {
 		// construct audio stream in 16bit format with given sample rate
 		AudioFormat.Encoding encoding = AudioFormat.Encoding.PCM_SIGNED;
-		int channels = 1;
-		int sampleSize = 16;
 		boolean bigEndian = true;
-		this.format = new AudioFormat(encoding, (float) sampleRate, sampleSize, channels,
-				(sampleSize / 8) * channels, (float) sampleRate, bigEndian);
+		AudioFormat format = new AudioFormat(encoding, sampleRate, SAMPLE_SIZE, RECORDING_CHANNELS,
+				(SAMPLE_SIZE / Byte.SIZE) * RECORDING_CHANNELS, sampleRate, bigEndian);
 		DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
 		dataLine = (SourceDataLine) AudioSystem.getLine(info);
 		dataLine.open(format);
 		dataLine.start();
 	}
 
-	protected void logMessage(String s) {
-		String msg = "ENC - " + s;
-		if (out != null) {
-			out.println(msg);
-		} else {
-			System.out.println(msg);
-		}
-
-	}
-
 	@Override
 	protected void closeAudioStream() throws NullPointerException {
 		dataLine.drain();
 		dataLine.close();
-		
+
 	}
 }
